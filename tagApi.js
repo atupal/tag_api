@@ -1,6 +1,7 @@
 
 var unirest = require("unirest");
 var fs = require("fs");
+var _ = require("underscore");
 
 function uploadImage(filepaths, callback) {
 
@@ -10,9 +11,20 @@ function uploadImage(filepaths, callback) {
     "accept": "application/json"
   }
 
+  var results = {};
+  var finished = _.after(filepaths.length+1, function() {
+    callback(results);
+  });
+
   var req = unirest.post("http://api.imagga.com/v1/content").header(headers);
   for (var idx in filepaths) {
     req.attach('file'+idx, filepaths[idx]);
+    var filepath = filepaths[idx];
+    results[filepath.split('/').slice(-1)] = {};
+    analyzeImage(filepath, function(filepath, faces) {
+      results[filepath.split('/').slice(-1)].faces = faces ? faces : [];
+      finished();
+    });
   }
 
   req.end(function (response) {
@@ -43,7 +55,6 @@ function uploadImage(filepaths, callback) {
     }
 
     req.end(function(response) {
-      var results = {};
       for (var idx in response.body.results) {
         var tagsDict = response.body.results[idx].tags;
         var tags = [];
@@ -54,10 +65,11 @@ function uploadImage(filepaths, callback) {
           if (cnt >= 10) break;
         }
 
-        results[ ids[response.body.results[idx].image] ] = tags;
+        results[ ids[response.body.results[idx].image] ].tags = tags;
       }
 
-      callback(results);
+      //callback(results);
+      finished();
     });
 
   });
@@ -100,10 +112,11 @@ function analyzeImage(filepath, callback) {
     })
     .attach('file', filepath)
     .end(function(response){
-      callback(response.body);
+      callback(filepath, response.body.faces);
     });
 }
 
-//uploadImage(["./example_photo.jpg", "./black.png"], console.log);
+uploadImage(["./example_photo.jpg", "./black.png", "fbb.jpg"], console.log);
+//uploadImage(["./example_photo.jpg", "./black.png"], function(results){});
 //analyzeImage("./fbb.jpg", console.log);
-analyzeImage("./example_photo.jpg", console.log);
+//analyzeImage("./example_photo.jpg", console.log);
