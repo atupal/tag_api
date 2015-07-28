@@ -3,7 +3,7 @@ var unirest = require("unirest");
 var req = unirest("GET", "http://api.imagga.com/v1/tagging");
 var fs = require("fs");
 
-function uploadImage(filepath) {
+function uploadImage(filepath, callback) {
   unirest.post("http://api.imagga.com/v1/content")
           .header({
             //"authorization": "Basic YWNjXzJkYzdkNzNjMmYwODliMToxYzQ3Yzg2ZDg0YjdmYjdjYjZjNzQ1NTQ1MmYwNTgzMQ==",
@@ -12,14 +12,15 @@ function uploadImage(filepath) {
           })
           .attach('file', filepath)
           .end(function (response) {
-            console.log(response.body);
+            //console.log(response.body);
             /*
              * { status: 'success',
              *   uploaded:
              *      [ { id: 'ae309b386efbcf7fb8d40431d8c470c6',
              *             filename: 'example_photo.jpg' } ] }
              */
-            getImageTags(response.body.uploaded[0].id);
+            callback(response.body.uploaded[0].id);
+            //getImageTags(response.body.uploaded[0].id);
           });
 }
 
@@ -48,6 +49,6 @@ function getImageTags(contentId) {
 
 }
 
-//uploadImage("./example_photo.jpg")
-uploadImage("/home/atupal/Pictures/black.png")
+uploadImage("./example_photo.jpg", getImageTags);
+//uploadImage("/home/atupal/Pictures/black.png")
 //getImageTags("ae309b386efbcf7fb8d40431d8c470c6");
