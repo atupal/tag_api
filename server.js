@@ -3,7 +3,7 @@ var mongodb = require('mongodb');
 var fs = require('fs-extra');
 var multipart = require('connect-multiparty');
 
-//var tagApi = require('./tagApi.js')
+var tagApi = require('./tagApi.js')
 
 var mongoClient = mongodb.MongoClient;
 var app = express();
@@ -41,58 +41,58 @@ app.get('/api/story/list', function(req, res) {
 
 // handle save story request POST
 app.post('/api/story/save', multipartMiddleware, function(req, res) {
-
-    console.log(req.body);
-    //console.log(req);
-    //console.log(req.files);
-
-    var comments = req.body.comments;
-    var idx = 0;
     var images = [];
     for (var key in req.files) {
         var hashName = req.files[key].path.split("\\").slice(-1)[0] + '.jpg';
-
-        var image = {}
-        image['url'] = imageLocation + hashName;
-        image['comments'] = comments[idx++];
-        image['tags'] = ['cloud'];
-        image['face'] = ['smile'];
-
-        images.push(image);
-
         fs.copy(req.files[key].path, imageLocation + hashName, function(err) {
             if (err == null) {
-                console.log("Save file " + " success.");
+                console.log("save file " + " success.");
             } else {
                 console.error("");
             }
         });
-
-        //uploadImage('./' + imageLocation + hashName);
+        images.push('./images/' + hashName);
     }
-
-    var story = {};
-    story['title']   = req.body.title;
-    story['content'] = req.body.content;
-    story['authorName']  = req.body.authorName;
-    story['PostDate']    = req.body.postDate;
-    story['images']  = images;
-    mongoClient.connect(connURL, function(err, db) {
-        if (err == null) {
-            insertStory(db, story, function(result) {
-                db.close();
-            })
-        } else {
-            log.error(err);
+debugger;
+    tagApi.uploadImage(images, function (results) {
+        var images = [];
+        var comments = req.body.comments;
+        var idx = 0;       
+debugger;
+        for (var key in req.files) {
+            var hashName = req.files[key].path.split("\\").slice(-1)[0] + '.jpg';
+            var image = {}
+            image['url'] = imageLocation + hashName;
+            // image['comments'] = comments[idx++];
+            image['tags'] = results[hashName].tags;
+            image['faces'] = results[hashName].faces;
+            images.push(image);
         }
 
-        console.log('Disconnected from server.')
-    });
+        var story = {};
+        story['title']   = req.body.title;
+        story['content'] = req.body.content;
+        story['authorName']  = req.body.authorName;
+        story['PostDate']    = req.body.postDate;
+        story['images']  = images;
 
-    res.format({
-        'application/json': function() {
-        res.send({'message' : 'done'});
-    }});
+        mongoClient.connect(connURL, function(err, db) {
+            if (err == null) {
+                insertStory(db, story, function() {
+                    db.close();
+                })
+            } else {
+                log.error(err);
+            }
+
+            console.log('disconnected from server.')
+        });
+
+        res.format({
+            'application/json': function() {
+            res.send({'message' : 'done'});
+        }});
+    });
 });
 
 app.get('/', function(req, res) {
@@ -101,16 +101,24 @@ app.get('/', function(req, res) {
     res.end(form);
 });
 
+app.get('/test', function(req, res) {
+    testCallback(function() { console.log(req); });
+    res.send("gao");
+});
+
 app.listen(8888);
 
+function testCallback(callback) {
+    callback();
+}
 function insertStory(db, data, callback) {
     db.collection(storyCollection).insert(data, function (err, res) {
         if (err == null) {
-            console.log('Insert story success.');
+            console.log('insert story success.');
         } else {
             console.error(err);
         }
-        callback(res);
+        callback();
     });
 }
 
