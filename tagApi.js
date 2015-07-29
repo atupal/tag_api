@@ -1,69 +1,83 @@
 
 var unirest = require("unirest");
 var fs = require("fs");
+var _ = require("underscore");
 
-module.exports = {
-  uploadImage : function (filepaths, callback) {
+function uploadImage(filepaths, callback) {
 
-    var headers = {
-      //"authorization": "Basic YWNjXzJkYzdkNzNjMmYwODliMToxYzQ3Yzg2ZDg0YjdmYjdjYjZjNzQ1NTQ1MmYwNTgzMQ==",
-      "authorization": "Basic YWNjXzM3MGI3MWVkNWE5MzA1ODplNjg3ZmRiMTkzMzBiZmFjMTcyNGRiNjhiMjkyN2IzMA==",
-      "accept": "application/json"
-    }
+  var headers = {
+    //"authorization": "Basic YWNjXzJkYzdkNzNjMmYwODliMToxYzQ3Yzg2ZDg0YjdmYjdjYjZjNzQ1NTQ1MmYwNTgzMQ==",
+    "authorization": "Basic YWNjXzM3MGI3MWVkNWE5MzA1ODplNjg3ZmRiMTkzMzBiZmFjMTcyNGRiNjhiMjkyN2IzMA==",
+    "accept": "application/json"
+  }
 
-    var req = unirest.post("http://api.imagga.com/v1/content").header(headers);
-    for (var idx in filepaths) {
-      req.attach('file'+idx, filepaths[idx]);
-    }
-debugger;
-    req.end(function (response) {
+  var results = {};
+  var finished = _.after(filepaths.length+1, function() {
+    console.log(results);
+    callback(results);
+  });
 
-      //console.log(response.body);
-
-      /*
-       * { status: 'success',
-       *   uploaded:
-       *      [ { id: 'ae309b386efbcf7fb8d40431d8c470c6',
-       *             filename: 'example_photo.jpg' } ] }
-       */
-
-      var ids = {};
-      for (var idx in response.body.uploaded) {
-        ids[response.body.uploaded[idx].id] = response.body.uploaded[idx].filename;
-      }
-
-      var req = unirest("GET", "http://api.imagga.com/v1/tagging").header(headers);
-      req.query({
-        "version": "2"
-      });
-
-      for (var id in ids) {
-        req.query({
-          "content": id
-        })
-      }
-
-      req.end(function(response) {
-        var results = {};
-        for (var idx in response.body.results) {
-          var tagsDict = response.body.results[idx].tags;
-          var tags = [];
-          var cnt = 0;
-          for (var i in tagsDict) {
-            tags.push(tagsDict[i].tag);
-            cnt += 1;
-            if (cnt >= 10) break;
-          }
-
-          results[ ids[response.body.results[idx].image] ] = tags;
-        }
-
-        callback(results);
-      });
+  var req = unirest.post("http://api.imagga.com/v1/content").header(headers);
+  for (var idx in filepaths) {
+    req.attach('file'+idx, filepaths[idx]);
+    var filepath = filepaths[idx];
+    results[filepath.split('/').slice(-1)] = {};
+    analyzeImage(filepath, function(filepath, faces) {
+      results[filepath.split('/').slice(-1)].faces = faces ? faces : [];
+      finished();
     });
   }
-};
 
+  req.end(function (response) {
+
+    //console.log(response.body);
+
+    /*
+     * { status: 'success',
+     *   uploaded:
+     *      [ { id: 'ae309b386efbcf7fb8d40431d8c470c6',
+     *             filename: 'example_photo.jpg' } ] }
+     */
+
+    var ids = {};
+    for (var idx in response.body.uploaded) {
+      ids[response.body.uploaded[idx].id] = response.body.uploaded[idx].filename;
+    }
+
+    var req = unirest("GET", "http://api.imagga.com/v1/tagging").header(headers);
+    req.query({
+      "version": "2"
+    });
+
+    for (var id in ids) {
+      req.query({
+        "content": id
+      })
+    }
+debugger;
+    req.end(function(response) {
+      console.log(response.body);
+      debugger;
+      for (var idx in response.body.results) {
+        var tagsDict = response.body.results[idx].tags;
+        var tags = [];
+        var cnt = 0;
+        for (var i in tagsDict) {
+          tags.push(tagsDict[i].tag);
+          cnt += 1;
+          if (cnt >= 10) break;
+        }
+
+        results[ ids[response.body.results[idx].image] ].tags = tags;
+      }
+
+      //callback(results);
+      finished();
+    });
+
+  });
+
+}
 
 function getImageTags(contentId) {
   var req = unirest("GET", "http://api.imagga.com/v1/tagging");
@@ -101,10 +115,12 @@ function analyzeImage(filepath, callback) {
     })
     .attach('file', filepath)
     .end(function(response){
-      callback(response.body);
+      callback(filepath, response.body.faces);
     });
 }
 
-//uploadImage(["./example_photo.jpg"], console.log);
+module.exports.uploadImage = uploadImage;
+//uploadImage(["./images/1GpO4Mw_K8kjdh-JtM8EkFkE.jpg.jpg", "./black.png", "fbb.jpg"], console.log);
+//uploadImage(["./example_photo.jpg", "./black.png"], function(results){});
 //analyzeImage("./fbb.jpg", console.log);
-//nalyzeImage("./example_photo.jpg", console.log);
+//analyzeImage("./example_photo.jpg", console.log);
